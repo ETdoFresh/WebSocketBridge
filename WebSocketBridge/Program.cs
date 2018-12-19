@@ -6,11 +6,10 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
+// TODO : Handle errors in sending and receiving
+
 namespace WebSocketBridge
 {
-    // TODO : Handle errors in sending and receiving
-    // TODO : Handle disconnects
-
     class Program
     {
         private const string EOL = "\r\n";
@@ -115,7 +114,17 @@ namespace WebSocketBridge
 
             var trimmed = new byte[bytesRead];
             Array.Copy(bytes, trimmed, trimmed.Length);
+
+            var opcode = trimmed[0] & 0x0F;
+            var closeConnectionRequested = opcode == 0x08;
             var decoded = DecodeWebSocketBytes(trimmed);
+
+            if (closeConnectionRequested)
+            {
+                CloseConnection(client, clientIndex, decoded);
+                return;
+            }
+
             var message = Encoding.UTF8.GetString(decoded);
             Console.WriteLine("Client " + clientIndex + ": Received " + message);
 
@@ -135,8 +144,6 @@ namespace WebSocketBridge
 
         private static byte[] DecodeWebSocketBytes(byte[] bytes)
         {
-            var byte1 = bytes[0];
-            var byte2 = bytes[1];
             var mask = new[] { bytes[2], bytes[3], bytes[4], bytes[5] };
             var decoded = new byte[bytes.Length - 6];
             Array.Copy(bytes, 6, decoded, 0, decoded.Length);
@@ -146,16 +153,37 @@ namespace WebSocketBridge
             return decoded;
         }
 
+        private static void CloseConnection(TcpClient client, int clientIndex, byte[] decoded)
+        {
+            var closeCode = 0;
+            var closeText = "No Code";
+            if (decoded.Length == 2)
+            {
+                closeCode = BitConverter.ToUInt16(decoded.Reverse().ToArray(), 0);
+                if (closeCode == 1000) closeText = "Normal";
+                if (closeCode == 1001) closeText = "Going Away";
+                if (closeCode == 1002) closeText = "Protocol Error";
+                if (closeCode == 1003) closeText = "Received Data Type Error (binary/text)";
+                if (closeCode == 1004) closeText = "Reserved";
+                if (closeCode == 1005) closeText = "No Status";
+                if (closeCode == 1006) closeText = "Abnormal Closure";
+                if (closeCode == 1007) closeText = "Received Data Type Error (non-UTF8?)";
+                if (closeCode == 1008) closeText = "Policy Violated";
+                if (closeCode == 1009) closeText = "Message Too Big";
+                if (closeCode == 1010) closeText = "Server Close Handshake Wrong";
+                if (closeCode == 1011) closeText = "Unexpected Condition";
+                if (closeCode == 1015) closeText = "TLS handshake failure";
+            }
+            Console.WriteLine("Client " + clientIndex + ": Close Connection (" + closeCode + ": " + closeText + ")");
+            client.Close();
+            clients.Remove(client);
+        }
+
         private static Socket ConnectTcpSocket()
         {
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Connect(iPAddress, port);
             return socket;
-        }
-
-        private static void SendToTcpClient(string message, Socket socket)
-        {
-            
         }
 
         private static byte[] ReceiveTcpClientBytes(Socket socket)
