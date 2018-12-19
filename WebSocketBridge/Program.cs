@@ -137,7 +137,7 @@ namespace WebSocketBridge
             var response = Encoding.UTF8.GetString(bytes);
             Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Received " + response);
 
-            SendToWebSocket(stream, response);
+            BeginSendToWebSocket(stream, response);
             Console.WriteLine("Client " + clientIndex + ": Sent " + response);
             BeginReceiveMessage(client, stream);
         }
@@ -208,15 +208,23 @@ namespace WebSocketBridge
 
         private static void SendWebSocketClientInstructions(NetworkStream stream)
         {
-            SendToWebSocket(stream, "Welcome to WebSocketBridge.");
-            SendToWebSocket(stream, "This will relay commands from this websocket to a tcp socket");
-            SendToWebSocket(stream, "Please send the server ip and port in the following format:");
-            SendToWebSocket(stream, "IPAddress: " + iPAddress.ToString());
-            SendToWebSocket(stream, "Port: " + port);
-            SendToWebSocket(stream, "Note: The above are the default settings.");
+            BeginSendToWebSocket(stream, "Welcome to WebSocketBridge." + EOL
+                + "This will relay commands from this websocket to a tcp socket" + EOL
+                + "Please send the server ip and port of tcp socket server in the following format:" + EOL
+                + EOL
+                + "IPAddress: " + iPAddress.ToString() + EOL
+                + "Port: " + port + EOL
+                + EOL
+                + "Note: The above are the default settings.");
         }
 
-        private static void SendToWebSocket(NetworkStream stream, string message)
+        private static void BeginSendToWebSocket(NetworkStream stream, string message)
+        {
+            List<byte> bytes = MessageToUnmaskedBytes(message);
+            stream.BeginWrite(bytes.ToArray(), 0, bytes.Count, OnSentToWebSocket, stream);
+        }
+
+        private static List<byte> MessageToUnmaskedBytes(string message)
         {
             List<byte> bytes = new List<byte>();
             bytes.Add(129);
@@ -233,7 +241,7 @@ namespace WebSocketBridge
                 bytes.AddRange(BitConverter.GetBytes((ulong)message.Length).Reverse());
             }
             bytes.AddRange(Encoding.UTF8.GetBytes(message));
-            stream.BeginWrite(bytes.ToArray(), 0, bytes.Count, OnSentToWebSocket, stream);
+            return bytes;
         }
 
         private static void OnSentToWebSocket(IAsyncResult ar)
