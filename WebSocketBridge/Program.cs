@@ -14,7 +14,7 @@ namespace WebSocketBridge
     {
         private const string EOL = "\r\n";
 
-        private static IPAddress iPAddress = IPAddress.Parse("192.168.254.194");
+        private static IPAddress iPAddress = IPAddress.Parse("127.0.0.1");
         private static int port = 9080;
 
         public static List<TcpClient> clients = new List<TcpClient>();
@@ -128,18 +128,61 @@ namespace WebSocketBridge
             var message = Encoding.UTF8.GetString(decoded);
             Console.WriteLine("Client " + clientIndex + ": Received " + message);
 
-            var socket = ConnectTcpSocket();
-            socket.Send(Encoding.UTF8.GetBytes(message));
-            Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Sent " + message);
-            bytes = ReceiveTcpClientBytes(socket);
-            socket.Close();
+            if (IsChangeIPAddressMessage(message))
+            {
+                if (ChangeIPAddress(message)) BeginSendToWebSocket(stream, "IPAddress: " + iPAddress);
+                else BeginSendToWebSocket(stream, "Error setting IP Address");
+            }
+            else if (IsChangePortMessage(message))
+            {
+                if (ChangePort(message)) BeginSendToWebSocket(stream, "Port: " + port);
+                else BeginSendToWebSocket(stream, "Error setting Port");
+            }
+            else
+            {
+                try
+                {
+                    var socket = ConnectTcpSocket();
+                    socket.Send(Encoding.UTF8.GetBytes(message));
+                    Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Sent " + message);
+                    bytes = ReceiveTcpClientBytes(socket);
+                    socket.Close();
 
-            var response = Encoding.UTF8.GetString(bytes);
-            Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Received " + response);
-
-            BeginSendToWebSocket(stream, response);
-            Console.WriteLine("Client " + clientIndex + ": Sent " + response);
+                    var response = Encoding.UTF8.GetString(bytes);
+                    Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Received " + response);
+                    BeginSendToWebSocket(stream, response);
+                    Console.WriteLine("Client " + clientIndex + ": Sent " + response);
+                }
+                catch
+                {
+                    var response = "Error connecting/communicating to tcp://" + iPAddress + ":" + port;
+                    BeginSendToWebSocket(stream, response);
+                    Console.WriteLine("Client " + clientIndex + ": Sent " + response);
+                }
+            }
             BeginReceiveMessage(client, stream);
+        }
+
+        private static bool ChangePort(string message)
+        {
+            message = message.Replace("Port: ", "");
+            return int.TryParse(message, out port);
+        }
+
+        private static bool ChangeIPAddress(string message)
+        {
+            message = message.Replace("IPAddress: ", "");
+            return IPAddress.TryParse(message, out iPAddress);
+        }
+
+        private static bool IsChangeIPAddressMessage(string message)
+        {
+            return message.StartsWith("IPAddress: ");
+        }
+
+        private static bool IsChangePortMessage(string message)
+        {
+            return message.StartsWith("Port: ");
         }
 
         private static byte[] DecodeWebSocketBytes(byte[] bytes)
