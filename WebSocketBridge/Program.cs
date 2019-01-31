@@ -29,6 +29,7 @@ namespace WebSocketBridge
         {
             var server = new TcpListener(IPAddress.Parse("127.0.0.1"), 9081);
             server.Start();
+            Console.WriteLine("Server: Started on {0}:{1}", iPAddress, port);
             BeginAcceptConnection(server);
         }
 
