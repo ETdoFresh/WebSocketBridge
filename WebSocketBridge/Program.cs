@@ -14,8 +14,11 @@ namespace WebSocketBridge
     {
         private const string EOL = "\r\n";
 
-        private static IPAddress iPAddress = IPAddress.Parse("127.0.0.1");
-        private static int port = 9080;
+        private static IPAddress webSocketIPAddress = IPAddress.Parse("127.0.0.1");
+        private static int webSocketPort = 9081;
+
+        private static IPAddress tcpIPAddress = IPAddress.Parse("127.0.0.1");
+        private static int tcpPort = 9080;
 
         public static List<TcpClient> clients = new List<TcpClient>();
 
@@ -27,9 +30,9 @@ namespace WebSocketBridge
 
         private static void StartServer()
         {
-            var server = new TcpListener(IPAddress.Parse("127.0.0.1"), 9081);
+            var server = new TcpListener(webSocketIPAddress, webSocketPort);
             server.Start();
-            Console.WriteLine("Server: Started on {0}:{1}", iPAddress, port);
+            Console.WriteLine("Server: Started on {0}:{1}", webSocketIPAddress, webSocketPort);
             BeginAcceptConnection(server);
         }
 
@@ -131,12 +134,12 @@ namespace WebSocketBridge
 
             if (IsChangeIPAddressMessage(message))
             {
-                if (ChangeIPAddress(message)) BeginSendToWebSocket(stream, "IPAddress: " + iPAddress);
+                if (ChangeIPAddress(message)) BeginSendToWebSocket(stream, "IPAddress: " + tcpIPAddress);
                 else BeginSendToWebSocket(stream, "Error setting IP Address");
             }
             else if (IsChangePortMessage(message))
             {
-                if (ChangePort(message)) BeginSendToWebSocket(stream, "Port: " + port);
+                if (ChangePort(message)) BeginSendToWebSocket(stream, "Port: " + tcpPort);
                 else BeginSendToWebSocket(stream, "Error setting Port");
             }
             else
@@ -145,18 +148,18 @@ namespace WebSocketBridge
                 {
                     var socket = ConnectTcpSocket();
                     socket.Send(Encoding.UTF8.GetBytes(message));
-                    Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Sent " + message);
+                    Console.WriteLine("Client " + clientIndex + ": tcp://" + tcpIPAddress + ":" + tcpPort + ": Sent " + message);
                     bytes = ReceiveTcpClientBytes(socket);
                     socket.Close();
 
                     var response = Encoding.UTF8.GetString(bytes);
-                    Console.WriteLine("Client " + clientIndex + ": tcp://" + iPAddress + ":" + port + ": Received " + response);
+                    Console.WriteLine("Client " + clientIndex + ": tcp://" + tcpIPAddress + ":" + tcpPort + ": Received " + response);
                     BeginSendToWebSocket(stream, response);
                     Console.WriteLine("Client " + clientIndex + ": Sent " + response);
                 }
                 catch
                 {
-                    var response = "Error connecting/communicating to tcp://" + iPAddress + ":" + port;
+                    var response = "Error connecting/communicating to tcp://" + tcpIPAddress + ":" + tcpPort;
                     BeginSendToWebSocket(stream, response);
                     Console.WriteLine("Client " + clientIndex + ": Sent " + response);
                 }
@@ -167,13 +170,13 @@ namespace WebSocketBridge
         private static bool ChangePort(string message)
         {
             message = message.Replace("Port: ", "");
-            return int.TryParse(message, out port);
+            return int.TryParse(message, out tcpPort);
         }
 
         private static bool ChangeIPAddress(string message)
         {
             message = message.Replace("IPAddress: ", "");
-            return IPAddress.TryParse(message, out iPAddress);
+            return IPAddress.TryParse(message, out tcpIPAddress);
         }
 
         private static bool IsChangeIPAddressMessage(string message)
@@ -226,7 +229,7 @@ namespace WebSocketBridge
         private static Socket ConnectTcpSocket()
         {
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(iPAddress, port);
+            socket.Connect(tcpIPAddress, tcpPort);
             return socket;
         }
 
@@ -256,8 +259,8 @@ namespace WebSocketBridge
                 + "This will relay commands from this websocket to a tcp socket" + EOL
                 + "Please send the server ip and port of tcp socket server in the following format:" + EOL
                 + EOL
-                + "IPAddress: " + iPAddress.ToString() + EOL
-                + "Port: " + port + EOL
+                + "IPAddress: " + tcpIPAddress.ToString() + EOL
+                + "Port: " + tcpPort + EOL
                 + EOL
                 + "Note: The above are the default settings.");
         }
